@@ -2,20 +2,35 @@ package edu.quinnipiac.ser210.starbuzz;
 
 import androidx.appcompat.app.AppCompatActivity;
 import android.content.Intent;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteException;
+import android.database.sqlite.SQLiteOpenHelper;
 import android.widget.AdapterView;
+import android.widget.CursorAdapter;
 import android.widget.ListView;
 import android.view.View;
 import android.os.Bundle;
+import android.widget.SimpleCursorAdapter;
 import android.widget.TextView;
+import android.widget.Toast;
+
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
 
+    private SQLiteDatabase db;
+    private Cursor favoritesCursor;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        setupOptionsListView();
+        setupFavoritesListView();
+    }
 
+    private void setupOptionsListView(){
         AdapterView.OnItemClickListener itemClickListener = new AdapterView.OnItemClickListener(){
             public void onItemClick(AdapterView<?> listView, View view, int position, long id){
                 if(position==0){
@@ -27,6 +42,45 @@ public class MainActivity extends AppCompatActivity {
 
         ListView listView = (ListView) findViewById(R.id.list_options);
         listView.setOnItemClickListener(itemClickListener);
+    }
 
+    private void setupFavoritesListView(){
+        ListView listFavorites = (ListView) findViewById(R.id.list_favorites);
+        try{
+            SQLiteOpenHelper starvuzzDatabaseHelper = new StarbuzzDatabaseHelper(this);
+            db = starvuzzDatabaseHelper.getReadableDatabase();
+            favoritesCursor = db.query("DRINK", new String[] {"_id", "NAME"}, "FAVORITE=1", null, null, null, null);
+            CursorAdapter favoriteAdatper = new SimpleCursorAdapter(MainActivity.this, android.R.layout.simple_list_item_1, favoritesCursor, new String[]{"NAME"}, new int[]{android.R.id.text1}, 0);
+            listFavorites.setAdapter(favoriteAdatper);
+        }catch(SQLiteException e){
+            Toast toast = Toast.makeText(this, "Database unavailable", Toast.LENGTH_SHORT);
+            toast.show();
+        }
+
+        listFavorites.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> listView, View v, int position, long id) {
+                Intent intent = new Intent(MainActivity.this, DrinkActivity.class);
+                intent.putExtra(DrinkActivity.EXTRA_DRINKID, (int)id);
+                startActivity(intent);
+            }
+        });
+    }
+
+
+    @Override
+    protected void onRestart() {
+        super.onRestart();
+        Cursor newCursor = db.query("DRINK", new String[]{"_id", "NAME"}, "FAVORITE = 1", null, null, null, null);
+        ListView listFavorites = (ListView) findViewById(R.id.list_favorites);
+        CursorAdapter adapter = (CursorAdapter) listFavorites.getAdapter();
+        favoritesCursor = newCursor;
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        favoritesCursor.close();
+        db.close();
     }
 }
